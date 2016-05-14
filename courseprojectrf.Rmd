@@ -1,0 +1,74 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Calli"
+date: "May 10, 2016"
+output: html_document
+---
+
+####Summary: 
+Several data points were provided to build a model predicting the quality of an exercise.  Principal Components analysis was used to extract 6 features that account for 88.12% of the variance in the dependent variable.  A random forest model was fit to the data with an estimated 8.65% out of sample error rate.    
+
+Call caret library
+```{r}
+library(caret)
+```
+
+Set working directory
+```{r}
+getwd()
+setwd("C:/Users/Calli6/Desktop")
+```
+
+####Preprocessing
+Read in training dataset and test dataset
+```{r}
+pml.training <- read.csv("C:/Users/Calli6/Desktop/pml-training.csv", stringsAsFactors=FALSE)
+pml.testing <- read.csv("C:/Users/Calli6/Desktop/pml-testing.csv", stringsAsFactors = FALSE)
+```
+
+There are several empty columns in the test dataset. These columns will not be useful to predict with the test data set so they will be removed from the training datset. The first 7 columns of the training dataset will also be removed.  These variables appear to be ID variables or date variables and will probably not be good predictors of the classe variable.   
+```{r}
+emptycols <- sapply(pml.testing, function (k) all(is.na(k)))
+pml.training_noNAcol <- pml.training[!emptycols]
+pml.training_final_all <- pml.training_noNAcol[,c(8:60)]
+
+```
+
+####Principal Components Analysis
+Even by removing the empty variables and the ID variables from training dataset there are still 53 variables. Principal components analysis will be used to reduce the number of variables that the model will use. 
+```{r}
+pml.training_final <- pml.training_noNAcol[,c(8:59)]
+principalcomps <- prcomp(pml.training_final)
+summary(principalcomps)
+```
+
+Plot the principal components to determine how many components we want to use in the model. The plot begins to flatten out around feature number 6 indicating that 6 features will account for most of the variance in the model. 
+```{r}
+plot(principalcomps, type = "l")
+```
+
+From the graph it looks like the first 6 principle components account for most of the variance. We will use 6 principal components for this analysis.  
+```{r}
+preProc <- preProcess(pml.training_final, method = "pca", pcaComp=6)
+preProc
+```
+
+We will use the random forest method to create a model on the training data. The principle components previously calculated will be used.  
+```{r}
+trainPC <- predict(preProc, pml.training_final)
+modelFit <- train(pml.training_final_all$classe~.,method="rf", data= trainPC)
+modelFit$finalModel # what are fitted values
+confusionMatrix(modelFit)
+```
+
+####Cross Validation 
+Because we used a random forest model, cross validation was applied within the model. A random forest model creates a subset of decision trees using different variables.  The model then applies a other data to the decision trees and averages all of the outcomes together. This is the cross validation for this model.
+
+####Out of Sample Error Rate
+The out of sample error is estimated by the OOB estimate of the error rate. The OOB error rate is listed as 8.65%.  
+
+####Validate model with testing dataset
+```{r pressure, echo=FALSE}
+testPC <- predict(preProc, pml.testing)
+predict(modelFit, testPC)
+```
